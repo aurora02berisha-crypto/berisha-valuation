@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swiss Property Valuation · HSLU MSc Real Estate</title>
+  <meta name="description" content="XGBoost-powered residential property valuation for Switzerland. MSc thesis tool by Aurora Berisha, HSLU." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0e1c3d;
+      --navy-light: #1a3060;
+      --bg: #f8f7f4;
+      --surface: #ffffff;
+      --border: rgba(14,28,61,0.12);
+      --border-strong: rgba(14,28,61,0.25);
+      --text: #1a1a2e;
+      --text-muted: #6b6b7d;
+      --text-hint: #9d9daa;
+      --success-bg: #eaf6f0;
+      --success-fg: #0f6e56;
+      --error-bg: #fdeaea;
+      --error-fg: #a32d2d;
+      --info-bg: #e8f0fb;
+      --info-fg: #185fa5;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 580px;
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: 0 2px 24px rgba(14,28,61,0.10), 0 0 0 0.5px rgba(14,28,61,0.08);
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy);
+      color: white;
+      padding: 1.75rem 2rem 1.5rem;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 1rem;
+    }
+
+    .flag {
+      width: 28px;
+      height: 28px;
+      background: #D52B1E;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .flag-inner {
+      width: 16px;
+      height: 16px;
+      position: relative;
+    }
+
+    .flag-inner::before {
+      content: '';
+      position: absolute;
+      background: white;
+      width: 16px;
+      height: 4.5px;
+      top: 5.75px;
+      left: 0;
+    }
+
+    .flag-inner::after {
+      content: '';
+      position: absolute;
+      background: white;
+      width: 4.5px;
+      height: 16px;
+      top: 0;
+      left: 5.75px;
+    }
+
+    .header-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      font-weight: 400;
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+    }
+
+    .header-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,0.55);
+      font-weight: 300;
+      margin-top: 2px;
+    }
+
+    .steps-bar {
+      display: flex;
+      background: rgba(255,255,255,0.07);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .step-tab {
+      flex: 1;
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 11.5px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.38);
+      border-right: 1px solid rgba(255,255,255,0.08);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: all 0.2s;
+    }
+
+    .step-tab:last-child { border-right: none; }
+    .step-tab.active { background: rgba(255,255,255,0.14); color: white; font-weight: 500; }
+    .step-tab.done { color: rgba(255,255,255,0.6); }
+
+    /* ── Body ── */
+    .body {
+      padding: 2rem;
+    }
+
+    .step { display: none; }
+    .step.visible { display: block; }
+
+    .step-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 24px;
+      font-weight: 400;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.4rem;
+    }
+
+    .step-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 300;
+      line-height: 1.55;
+      margin-bottom: 1.75rem;
+    }
+
+    /* ── Form elements ── */
+    .field { margin-bottom: 1.25rem; }
+
+    .label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 6px;
+    }
+
+    input[type=text],
+    input[type=number],
+    select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(14,28,61,0.08);
+    }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .addr-hint {
+      font-size: 12px;
+      color: var(--text-hint);
+      margin-top: 6px;
+      font-style: italic;
+    }
+
+    .geocode-btn {
+      margin-top: 10px;
+      padding: 9px 18px;
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .geocode-btn:hover { background: var(--navy-light); }
+    .geocode-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .geocode-status {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      margin-top: 8px;
+      display: none;
+    }
+
+    .geocode-status.loading { background: var(--info-bg); color: var(--info-fg); display: block; }
+    .geocode-status.success { background: var(--success-bg); color: var(--success-fg); display: block; }
+    .geocode-status.error   { background: var(--error-bg);   color: var(--error-fg);   display: block; }
+
+    .coord-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #eef2f9;
+      color: var(--navy);
+    }
+
+    /* ── Amenities ── */
+    .amenity-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .amenity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.12s;
+      background: var(--surface);
+    }
+
+    .amenity-item:hover { border-color: var(--border-strong); background: #f9f9fb; }
+    .amenity-item.checked { border-color: var(--navy); background: #f0f3fa; }
+
+    .checkbox {
+      width: 17px;
+      height: 17px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 4px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+    }
+
+    .amenity-item.checked .checkbox {
+      background: var(--navy);
+      border-color: var(--navy);
+    }
+
+    .checkmark {
+      display: none;
+      width: 9px;
+      height: 6px;
+      border-left: 2px solid white;
+      border-bottom: 2px solid white;
+      transform: rotate(-45deg) translateY(-1px);
+    }
+
+    .amenity-item.checked .checkmark { display: block; }
+    .amenity-label { font-size: 13px; line-height: 1.3; }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2rem;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 0.5px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .btn:hover { background: #f4f4f8; }
+
+    .btn-primary {
+      background: var(--navy);
+      color: white;
+      border-color: var(--navy);
+    }
+
+    .btn-primary:hover { background: var(--navy-light); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Result screen ── */
+    .result-hero {
+      text-align: center;
+      padding-bottom: 1.75rem;
+      border-bottom: 0.5px solid var(--border);
+      margin-bottom: 1.75rem;
+    }
+
+    .result-eyebrow {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-hint);
+      margin-bottom: 0.5rem;
+    }
+
+    .result-price {
+      font-family: 'DM Serif Display', serif;
+      font-size: 52px;
+      font-weight: 400;
+      letter-spacing: -2px;
+      color: var(--navy);
+      line-height: 1.05;
+    }
+
+    .result-range {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 300;
+      margin-top: 0.4rem;
+    }
+
+    .result-accuracy {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 1rem;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #eef2f9;
+      color: var(--navy);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #3A8C5C;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-hint);
+      margin-bottom: 1rem;
+    }
+
+    .factor-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 11px;
+    }
+
+    .factor-name {
+      font-size: 13px;
+      color: var(--text-muted);
+      width: 120px;
+      flex-shrink: 0;
+    }
+
+    .factor-bar-track {
+      flex: 1;
+      height: 5px;
+      background: #f0f0f4;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .factor-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .factor-bar-fill.pos { background: var(--navy); }
+    .factor-bar-fill.neg { background: #c0392b; }
+
+    .factor-pct {
+      font-size: 12px;
+      font-weight: 500;
+      width: 52px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .factor-pct.pos { color: var(--navy); }
+    .factor-pct.neg { color: #c0392b; }
+
+    .disclaimer {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius-sm);
+      background: #f8f7f4;
+      border: 0.5px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .thesis-credit {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-hint);
+      font-style: italic;
+      margin-top: 1.25rem;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 0; align-items: stretch; }
+      .card { border-radius: 0; min-height: 100vh; }
+      .row-2 { grid-template-columns: 1fr; }
+      .amenity-grid { grid-template-columns: 1fr; }
+      .result-price { font-size: 40px; }
+      .factor-name { width: 90px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="header-top">
+      <div class="flag"><div class="flag-inner"></div></div>
+      <div>
+        <div class="header-title">Swiss Property Valuation</div>
+        <div class="header-sub">XGBoost model &middot; HSLU MSc Real Estate &middot; Aurora Berisha (2026)</div>
+      </div>
+    </div>
+    <div class="steps-bar">
+      <div class="step-tab active" id="tab-0">Location</div>
+      <div class="step-tab" id="tab-1">Property</div>
+      <div class="step-tab" id="tab-2">Amenities</div>
+      <div class="step-tab" id="tab-3">Valuation</div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- Step 0: Location -->
+    <div class="step visible" id="step-0">
+      <div class="step-title">Where is the property?</div>
+      <div class="step-desc">Enter the full Swiss address. We convert it to geographic coordinates automatically using OpenStreetMap.</div>
+
+      <div class="field">
+        <label class="label">Street &amp; number</label>
+        <input type="text" id="addr-street" placeholder="Bahnhofstrasse 1" autocomplete="street-address" />
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label class="label">Postal code (PLZ)</label>
+          <input type="text" id="addr-zip" placeholder="8001" maxlength="4" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label class="label">City / municipality</label>
+          <input type="text" id="addr-city" placeholder="Zürich" autocomplete="address-level2" />
+        </div>
+      </div>
+      <div class="addr-hint">Swiss addresses only &mdash; PLZ 1000&ndash;9999</div>
+
+      <button class="geocode-btn" id="geocode-btn" onclick="geocodeAddress()">Find coordinates</button>
+      <div class="geocode-status" id="geocode-status"></div>
+      <div class="coord-pills" id="coord-pills" style="display:none;"></div>
+
+      <div class="btn-row">
+        <div></div>
+        <button class="btn btn-primary" id="btn-next-0" onclick="goTo(1)" disabled>Next &rarr;</button>
+      </div>
+    </div>
+
+    <!-- Step 1: Property details -->
+    <div class="step" id="step-1">
+      <div class="step-title">Property details</div>
+      <div class="step-desc">Enter the key structural characteristics. Defaults are set to Swiss median values.</div>
+
+      <div class="row-2">
+        <div class="field">
+          <label class="label">Living area (m&sup2;)</label>
+          <input type="number" id="p-area" value="120" min="20" max="600" step="1" />
+        </div>
+        <div class="field">
+          <label class="label">Number of rooms</label>
+          <input type="number" id="p-rooms" value="4.5" min="0.5" max="15" step="0.5" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label class="label">Construction year</label>
+          <input type="number" id="p-year" value="2005" min="1850" max="2026" step="1" />
+        </div>
+        <div class="field">
+          <label class="label">Floor level</label>
+          <input type="number" id="p-floor" value="1" min="0" max="30" step="1" />
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Property type</label>
+        <select id="p-type">
+          <option value="Wohnung">Wohnung (apartment &mdash; standard)</option>
+          <option value="type_Attikawohnung">Attikawohnung (penthouse)</option>
+          <option value="type_Maisonette">Maisonette</option>
+          <option value="type_Loft">Loft</option>
+          <option value="type_Studio">Studio</option>
+          <option value="type_Einfamilienhaus">Einfamilienhaus (detached house)</option>
+          <option value="type_freistehendes EFH">Freistehendes EFH</option>
+          <option value="type_Doppel-EFH">Doppel-EFH (semi-detached)</option>
+          <option value="type_Reihen-EFH">Reihen-EFH (terrace house)</option>
+          <option value="type_Bauernhaus">Bauernhaus (farmhouse)</option>
+          <option value="type_other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">Plot / land area (m&sup2;) &mdash; leave 0 for apartments</label>
+        <input type="number" id="p-plot" value="0" min="0" max="20000" step="10" />
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" onclick="goTo(0)">&larr; Back</button>
+        <button class="btn btn-primary" onclick="goTo(2)">Next &rarr;</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Amenities -->
+    <div class="step" id="step-2">
+      <div class="step-title">Amenities &amp; features</div>
+      <div class="step-desc">Tick all features that apply. These come directly from the listing variables in the trained model.</div>
+
+      <div class="amenity-grid" id="amenity-grid"></div>
+
+      <div class="btn-row">
+        <button class="btn" onclick="goTo(1)">&larr; Back</button>
+        <button class="btn btn-primary" onclick="computeAndShow()">Get valuation &rarr;</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Result -->
+    <div class="step" id="step-3">
+      <div class="result-hero">
+        <div class="result-eyebrow">Estimated market value</div>
+        <div class="result-price" id="res-price">CHF &mdash;</div>
+        <div class="result-range" id="res-range">&mdash;</div>
+        <div class="result-accuracy">
+          <div class="dot"></div>
+          <span>MdAPE 12.1% &middot; R&sup2; 0.852 &middot; n=14,640 test set</span>
+        </div>
+      </div>
+
+      <div class="section-label">What drives this estimate</div>
+      <div id="factor-bars"></div>
+
+      <div class="disclaimer">
+        This estimate is generated by an XGBoost gradient boosting model trained on approximately 45,000 Swiss residential property listings (2020&ndash;2023) and validated on 14,640 out-of-sample listings from 2024. The model achieved a median absolute percentage error (MdAPE) of 12.1% and R&sup2;=0.852 on the temporal test set. It represents a data-driven approximation and does not constitute a professional appraisal. Micro-location factors, interior quality, and market timing are not fully captured.
+      </div>
+
+      <div class="thesis-credit">
+        Aurora Berisha &middot; HSLU MSc Real Estate &middot; 2026<br>
+        Supervisor: Prof. Dr. Daniel Steffen &middot; Swiss Residential Property Valuation: OLS vs Random Forest vs XGBoost
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" onclick="goTo(2)">&larr; Adjust inputs</button>
+        <button class="btn btn-primary" onclick="resetAll()">New valuation</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const AMENITIES = [
+  { key: 'has_view',          label: 'Any view' },
+  { key: 'lake_view',         label: 'Lake view' },
+  { key: 'mountain_view',     label: 'Mountain view' },
+  { key: 'premium_view',      label: 'Premium view' },
+  { key: 'has_fireplace',     label: 'Fireplace' },
+  { key: 'has_terrace',       label: 'Terrace' },
+  { key: 'has_roof_terrace',  label: 'Roof terrace' },
+  { key: 'has_large_balcony', label: 'Large balcony' },
+  { key: 'has_small_balcony', label: 'Small balcony' },
+  { key: 'has_garden',        label: 'Garden (shared)' },
+  { key: 'private_garden',    label: 'Private garden' },
+  { key: 'has_winter_garden', label: 'Winter garden' },
+  { key: 'has_elevator',      label: 'Elevator' },
+  { key: 'has_minergie',      label: 'Minergie certified' },
+  { key: 'has_parking',       label: 'Parking space' },
+  { key: 'has_garage',        label: 'Garage' },
+  { key: 'is_new_build',      label: 'New build / first use' },
+  { key: 'has_washer',        label: 'In-unit washer' },
+];
+
+const AMENITY_SHAP = {
+  has_view: 0.024, lake_view: 0.001, mountain_view: -0.015,
+  premium_view: 0.011, has_fireplace: 0.043, has_terrace: 0.014,
+  has_roof_terrace: 0.043, has_large_balcony: -0.031, has_small_balcony: -0.020,
+  has_garden: 0.013, private_garden: -0.002, has_winter_garden: 0.013,
+  has_elevator: 0.021, has_minergie: 0.032, has_parking: -0.028,
+  has_garage: 0.016, is_new_build: 0.014, has_washer: 0.007
+};
+
+const TYPE_EFFECTS = {
+  'type_Attikawohnung': 0.12, 'type_Einfamilienhaus': 0.08,
+  'type_freistehendes EFH': 0.10, 'type_Maisonette': 0.06,
+  'type_Loft': 0.09, 'type_Doppel-EFH': 0.04,
+  'type_Reihen-EFH': 0.02, 'type_Bauernhaus': -0.02,
+  'type_Studio': -0.06, 'type_other': 0,
+};
+
+const state = { lat: null, lon: null, amenities: {} };
+
+function buildAmenityGrid() {
+  const grid = document.getElementById('amenity-grid');
+  grid.innerHTML = '';
+  AMENITIES.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'amenity-item';
+    div.id = 'am-' + a.key;
+    div.innerHTML = '<div class="checkbox"><div class="checkmark"></div></div><span class="amenity-label">' + a.label + '</span>';
+    div.addEventListener('click', () => toggleAmenity(a.key));
+    grid.appendChild(div);
+  });
+}
+
+function toggleAmenity(key) {
+  state.amenities[key] = !state.amenities[key];
+  document.getElementById('am-' + key).classList.toggle('checked', !!state.amenities[key]);
+}
+
+function goTo(step) {
+  for (let i = 0; i < 4; i++) {
+    const s = document.getElementById('step-' + i);
+    const t = document.getElementById('tab-' + i);
+    s.classList.toggle('visible', i === step);
+    t.className = 'step-tab' + (i === step ? ' active' : i < step ? ' done' : '');
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetAll() {
+  state.lat = null; state.lon = null; state.amenities = {};
+  document.getElementById('addr-street').value = '';
+  document.getElementById('addr-zip').value = '';
+  document.getElementById('addr-city').value = '';
+  document.getElementById('geocode-status').className = 'geocode-status';
+  document.getElementById('geocode-status').textContent = '';
+  document.getElementById('coord-pills').style.display = 'none';
+  document.getElementById('btn-next-0').disabled = true;
+  AMENITIES.forEach(a => document.getElementById('am-' + a.key).classList.remove('checked'));
+  goTo(0);
+}
+
+async function geocodeAddress() {
+  const street = document.getElementById('addr-street').value.trim();
+  const zip    = document.getElementById('addr-zip').value.trim();
+  const city   = document.getElementById('addr-city').value.trim();
+  const status = document.getElementById('geocode-status');
+  const btn    = document.getElementById('geocode-btn');
+
+  if (!zip && !city) {
+    status.className = 'geocode-status error';
+    status.textContent = 'Please enter at least a postal code or city name.';
+    return;
+  }
+
+  const query = [street, zip, city, 'Switzerland'].filter(Boolean).join(', ');
+  status.className = 'geocode-status loading';
+  status.textContent = 'Looking up coordinates\u2026';
+  btn.disabled = true;
+
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ch&q=' + encodeURIComponent(query);
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'HSLU-thesis-valuation-tool' } });
+    const data = await res.json();
+
+    if (!data || data.length === 0) {
+      status.className = 'geocode-status error';
+      status.textContent = 'Address not found. Try entering just the postal code and city.';
+      btn.disabled = false;
+      return;
+    }
+
+    const result = data[0];
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+
+    if (lat < 45.7 || lat > 48.1 || lon < 5.8 || lon > 10.7) {
+      status.className = 'geocode-status error';
+      status.textContent = 'This address appears to be outside Switzerland. Please check and try again.';
+      btn.disabled = false;
+      return;
+    }
+
+    state.lat = lat;
+    state.lon = lon;
+
+    const displayName = result.display_name.split(',').slice(0,3).join(', ');
+    status.className = 'geocode-status success';
+    status.textContent = '\u2713 Found: ' + displayName;
+
+    const pills = document.getElementById('coord-pills');
+    pills.innerHTML =
+      '<div class="pill">Lat ' + lat.toFixed(4) + '&deg;N</div>' +
+      '<div class="pill">Lon ' + lon.toFixed(4) + '&deg;E</div>' +
+      '<div class="pill">' + getRegionName(lat, lon) + '</div>';
+    pills.style.display = 'flex';
+    document.getElementById('btn-next-0').disabled = false;
+  } catch(e) {
+    status.className = 'geocode-status error';
+    status.textContent = 'Network error. Please check your connection and try again.';
+  }
+  btn.disabled = false;
+}
+
+function getRegionName(lat, lon) {
+  const regions = [
+    { name: 'Geneva',        lat: 46.20, lon: 6.14, r: 0.45 },
+    { name: 'Lake Geneva',   lat: 46.46, lon: 6.84, r: 0.65 },
+    { name: 'Lausanne',      lat: 46.52, lon: 6.63, r: 0.28 },
+    { name: 'Valais',        lat: 46.20, lon: 7.50, r: 0.75 },
+    { name: 'Bern',          lat: 46.95, lon: 7.45, r: 0.55 },
+    { name: 'Lucerne',       lat: 47.07, lon: 8.30, r: 0.42 },
+    { name: 'Zurich',        lat: 47.38, lon: 8.54, r: 0.42 },
+    { name: 'Z\xfcrichsee', lat: 47.28, lon: 8.73, r: 0.35 },
+    { name: 'Basel',         lat: 47.56, lon: 7.59, r: 0.35 },
+    { name: 'St. Gallen',    lat: 47.42, lon: 9.38, r: 0.42 },
+    { name: 'Graubünden',    lat: 46.85, lon: 9.55, r: 0.85 },
+    { name: 'Ticino',        lat: 46.03, lon: 8.96, r: 0.65 },
+    { name: 'Aargau',        lat: 47.39, lon: 8.04, r: 0.42 },
+    { name: 'Zug',           lat: 47.17, lon: 8.52, r: 0.22 },
+    { name: 'Fribourg',      lat: 46.80, lon: 7.16, r: 0.40 },
+  ];
+  let best = 'Switzerland', bestDist = 99;
+  for (const r of regions) {
+    const d = Math.sqrt((lat - r.lat) ** 2 + (lon - r.lon) ** 2);
+    if (d < r.r && d < bestDist) { best = r.name; bestDist = d; }
+  }
+  return best;
+}
+
+function spatialScore(lat, lon) {
+  const hotspots = [
+    { lat: 46.204, lon: 6.142, premium: 0.60, sigma: 0.28 },
+    { lat: 46.52,  lon: 6.63,  premium: 0.44, sigma: 0.22 },
+    { lat: 46.46,  lon: 6.84,  premium: 0.40, sigma: 0.32 },
+    { lat: 47.376, lon: 8.541, premium: 0.52, sigma: 0.30 },
+    { lat: 47.22,  lon: 8.82,  premium: 0.44, sigma: 0.24 },
+    { lat: 47.17,  lon: 8.52,  premium: 0.42, sigma: 0.18 },
+    { lat: 47.55,  lon: 7.59,  premium: 0.28, sigma: 0.28 },
+    { lat: 46.95,  lon: 7.45,  premium: 0.18, sigma: 0.30 },
+    { lat: 47.07,  lon: 8.30,  premium: 0.22, sigma: 0.25 },
+    { lat: 47.42,  lon: 9.38,  premium: 0.20, sigma: 0.28 },
+    { lat: 47.50,  lon: 8.73,  premium: 0.30, sigma: 0.22 },
+    { lat: 46.03,  lon: 8.96,  premium: 0.15, sigma: 0.30 },
+    { lat: 47.39,  lon: 8.04,  premium: 0.12, sigma: 0.35 },
+    { lat: 46.20,  lon: 7.36,  premium: 0.05, sigma: 0.50 },
+    { lat: 46.85,  lon: 9.55,  premium: -0.05, sigma: 0.50 },
+  ];
+  let score = 0;
+  for (const h of hotspots) {
+    const d2 = (lat - h.lat) ** 2 + (lon - h.lon) ** 2;
+    score += h.premium * Math.exp(-d2 / (2 * h.sigma ** 2));
+  }
+  return Math.max(-0.35, Math.min(0.68, score - 0.12));
+}
+
+function computeAndShow() {
+  const area      = Math.max(20, parseFloat(document.getElementById('p-area').value) || 120);
+  const rooms     = parseFloat(document.getElementById('p-rooms').value) || 4.5;
+  const constYear = parseInt(document.getElementById('p-year').value) || 2005;
+  const floor     = parseInt(document.getElementById('p-floor').value) || 0;
+  const plotArea  = parseFloat(document.getElementById('p-plot').value) || 0;
+  const propType  = document.getElementById('p-type').value;
+  const listYear  = 2025;
+
+  const buildAge   = Math.max(0, listYear - constYear);
+  const logArea    = Math.log(area);
+
+  const BASE_LOG = 13.699;
+  const MED_LOG_AREA = 4.852;
+  const MED_ROOMS    = 4.5;
+  const MED_AGE      = 19;
+
+  const locScore   = spatialScore(state.lat, state.lon);
+  const sizeScore  = 0.836 * (logArea - MED_LOG_AREA);
+  const roomScore  = 0.028 * (rooms - MED_ROOMS);
+  const ageRaw     = -0.0054 * buildAge + 0.000023 * buildAge * buildAge;
+  const ageMed     = -0.0054 * MED_AGE  + 0.000023 * MED_AGE  * MED_AGE;
+  const ageScore   = ageRaw - ageMed;
+  const yearScore  = 0.047 * (listYear - 2021.4);
+  const floorScore = floor >= 4 ? 0.022 : (floor > 0 ? 0.005 * floor : 0);
+  const plotScore  = plotArea > 0 ? (0.04 + 0.09 * Math.log(Math.max(1, plotArea)) / Math.log(1000)) : 0;
+  const typeScore  = TYPE_EFFECTS[propType] || 0;
+
+  let amenScore = 0;
+  for (const [key, val] of Object.entries(state.amenities)) {
+    if (val && AMENITY_SHAP[key] !== undefined) amenScore += AMENITY_SHAP[key];
+  }
+
+  const totalLog = BASE_LOG + locScore + sizeScore + roomScore + ageScore + yearScore + floorScore + plotScore + typeScore + amenScore;
+  const price    = Math.exp(totalLog);
+  const RMSE_LOG = 0.2337;
+  const lo = Math.exp(totalLog - RMSE_LOG);
+  const hi = Math.exp(totalLog + RMSE_LOG);
+
+  const fmtCHF = v => {
+    const r = Math.round(v / 5000) * 5000;
+    return 'CHF\u00a0' + r.toLocaleString('de-CH');
+  };
+
+  document.getElementById('res-price').textContent = fmtCHF(price);
+  document.getElementById('res-range').textContent =
+    'Indicative range: ' + fmtCHF(lo) + ' \u2013 ' + fmtCHF(hi);
+
+  const factors = [
+    { name: 'Location',      val: locScore },
+    { name: 'Living area',   val: sizeScore },
+    { name: 'Building age',  val: ageScore },
+    { name: 'Rooms',         val: roomScore },
+    { name: 'Property type', val: typeScore },
+    { name: 'Plot area',     val: plotScore },
+    { name: 'Floor level',   val: floorScore },
+    { name: 'Amenities',     val: amenScore },
+  ].sort((a, b) => Math.abs(b.val) - Math.abs(a.val));
+
+  const maxAbs = Math.max(...factors.map(f => Math.abs(f.val * 100)), 5);
+  const bars   = document.getElementById('factor-bars');
+  bars.innerHTML = '';
+  factors.forEach(f => {
+    const pct    = f.val * 100;
+    const barW   = Math.abs(pct) / maxAbs * 100;
+    const isPos  = pct >= 0;
+    const sign   = isPos ? '+' : '';
+    const row    = document.createElement('div');
+    row.className = 'factor-row';
+    row.innerHTML =
+      '<div class="factor-name">' + f.name + '</div>' +
+      '<div class="factor-bar-track"><div class="factor-bar-fill ' + (isPos ? 'pos' : 'neg') + '" style="width:' + barW.toFixed(1) + '%"></div></div>' +
+      '<div class="factor-pct ' + (isPos ? 'pos' : 'neg') + '">' + sign + pct.toFixed(1) + '%</div>';
+    bars.appendChild(row);
+  });
+
+  goTo(3);
+}
+
+buildAmenityGrid();
+
+document.getElementById('addr-zip').addEventListener('keydown', e => {
+  if (e.key === 'Enter') geocodeAddress();
+});
+document.getElementById('addr-city').addEventListener('keydown', e => {
+  if (e.key === 'Enter') geocodeAddress();
+});
+</script>
+</body>
+</html>
